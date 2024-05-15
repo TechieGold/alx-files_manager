@@ -10,31 +10,43 @@ class FilesController {
     this.FOLDER_PATH = FOLDER_PATH;
   }
 
-  async postUpload(req, res) {
+  static async postUpload(req, res) {
     const tokenHeader = req.headers['x-token'];
     const userId = await redisClient.get(`auth_${tokenHeader}`);
     const user = await dbClient.db
       .collection('users')
       .findOne({ _id: new ObjectId(userId) });
-    if (!user) return res.status(401).send({ error: 'Unauthorized' });
+    if (!user) {
+      return res.status(401).send({ error: 'Unauthorized' });
+    }
     const {
       name, type, parentId, isPublic, data,
     } = req.body;
     const acceptedTypes = ['folder', 'file', 'image'];
-    if (!name) return res.status(401).send({ error: 'Missing name' });
-    if (!type || !acceptedTypes.includes(type)) return res.status(401).send({ error: 'Missing type' });
-    if (!data && type !== acceptedTypes[0]) return res.status(401).send({ error: 'Missing data' });
+    if (!name) {
+      return res.status(401).send({ error: 'Missing name' });
+    }
+    if (!type || !acceptedTypes.includes(type)) {
+      return res.status(401).send({ error: 'Missing type' });
+    }
+    if (!data && type !== acceptedTypes[0]) {
+      return res.status(401).send({ error: 'Missing data' });
+    }
     if (parentId) {
       const parent = await dbClient.db
         .collection('files')
         .findOne({ _id: new ObjectId(parentId) });
-      if (!parent) return res.status(401).send({ error: 'Parent not found' });
+      if (!parent) {
+        return res.status(401).send({ error: 'Parent not found' });
+      }
       if (parent.type !== acceptedTypes[0]) {
         return res
           .status(401)
           .send({ error: 'Parent is not a folder' });
       }
-      if (parent.userId !== user._id.toString()) return res.status(401).send({ error: 'Unauthorized' });
+      if (parent.userId !== user._id.toString()) {
+        return res.status(401).send({ error: 'Unauthorized' });
+      }
     }
     if (type === acceptedTypes[0]) {
       const newFolder = await dbClient.db.collection('files').insertOne({
@@ -62,6 +74,26 @@ class FilesController {
       userId: user._id.toString(),
     });
     return res.status(201).send(newFile.ops[0]);
+  }
+
+  static async getShow(req, res) {
+    const tokenHeader = req.header['x-token'];
+    const userId = await redisClient.get(`auth_${tokenHeader}`);
+    const user = await dbClient.db
+      .collection('users')
+      .findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      return res.status(401).send({ error: 'Unauthorized' });
+    }
+    const { id } = req.params;
+    const file = await dbClient.db
+      .collection('files')
+      .findOne({ _id: new ObjectId(id) });
+
+    if (!file || (file && file.userId !== user._id.toString())) {
+      return res.status(404).send({ error: 'Not found' });
+    }
+    return res.status(200).send(file);
   }
 }
 
