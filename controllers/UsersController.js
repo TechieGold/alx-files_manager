@@ -1,6 +1,6 @@
 import sha1 from 'sha1';
 import { ObjectID } from 'mongodb';
-import Queue from 'bull/lib/queue';
+import Queue from 'bull';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
@@ -8,7 +8,8 @@ const userQueue = new Queue('userQueue', 'redis://127.0.0.1:6379');
 
 class UsersController {
   static postNew(req, res) {
-    const { email, password } = req.body;
+    const { email } = req.body;
+    const { password } = req.body;
 
     if (!email) {
       res.status(400).json({ error: 'Missing email' });
@@ -22,7 +23,7 @@ class UsersController {
     const users = dbClient.db.collection('users');
     users.findOne({ email }, (err, user) => {
       if (user) {
-        res.status(400).json({ error: 'Already exists' });
+        res.status(400).json({ error: 'Already exist' });
       } else {
         const hashedPwd = sha1(password);
         users.insertOne(
@@ -42,15 +43,14 @@ class UsersController {
     const token = req.header('X-Token');
     const key = `auth_${token}`;
     const userId = await redisClient.get(key);
-
     if (userId) {
       const users = dbClient.db.collection('users');
-      const objId = new ObjectID(userId);
-      users.findOne({ _id: objId }, (err, user) => {
+      const objID = new ObjectID(userId);
+      users.findOne({ _id: objID }, (err, user) => {
         if (user) {
           res.status(200).json({ id: userId, email: user.email });
         } else {
-          res.status(400).json({ error: 'Unauthorized' });
+          res.status(401).json({ error: 'Unauthorized' });
         }
       });
     } else {
