@@ -95,6 +95,30 @@ class FilesController {
     }
     return res.status(200).send(file);
   }
+
+  static async getIndex(req, res) {
+    const tokenHeader = req.header['x-token'];
+    const userId = await redisClient.get(`auth_${tokenHeader}`);
+    const user = await dbClient.db
+      .collection('users')
+      .findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      return res.status(401).send({ error: 'Unauthorized' });
+    }
+    const { parentId, page = 0 } = req.query;
+    const limit = 20;
+    const skip = page * limit;
+
+    const files = await dbClient.db
+      .collection('files')
+      .aggregate([
+        { $match: { parentId } },
+        { $skip: skip },
+        { $limit: limit },
+      ])
+      .toArray();
+    return res.status(200).send(files);
+  }
 }
 
 module.exports = FilesController;
